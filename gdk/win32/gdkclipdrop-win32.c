@@ -333,8 +333,8 @@ typedef struct _GdkWin32ClipboardThreadAdvertise GdkWin32ClipboardThreadAdvertis
 struct _GdkWin32ClipboardThreadAdvertise
 {
   GdkWin32ClipboardThreadQueueItem  parent;
-  GArray                      *pairs; /* of GdkWin32ContentFormatPair */
-  gboolean                     unset;
+  GArray                           *pairs; /* of GdkWin32ContentFormatPair */
+  gboolean                          unset;
 };
 
 typedef struct _GdkWin32ClipboardThreadRetrieve GdkWin32ClipboardThreadRetrieve;
@@ -342,26 +342,33 @@ typedef struct _GdkWin32ClipboardThreadRetrieve GdkWin32ClipboardThreadRetrieve;
 struct _GdkWin32ClipboardThreadRetrieve
 {
   GdkWin32ClipboardThreadQueueItem  parent;
-  GArray                      *pairs; /* of GdkWin32ContentFormatPair */
-  gint64                       sequence_number;
+  GArray                           *pairs; /* of GdkWin32ContentFormatPair */
+  gint64                            sequence_number;
+};
+
+typedef struct _GdkWin32ClipboardInfo GdkWin32ClipboardInfo;
+
+struct _GdkWin32ClipboardInfo
+{
+  UINT        w32format;
+  const char *contentformat;
+  HANDLE      handle;
 };
 
 typedef struct _GdkWin32ClipboardStorePrepElement GdkWin32ClipboardStorePrepElement;
 
 struct _GdkWin32ClipboardStorePrepElement
 {
-  UINT           w32format;
-  const char    *contentformat;
-  HANDLE         handle;
-  GOutputStream *stream;
+  GdkWin32ClipboardInfo  clipboard_info;
+  GOutputStream         *stream;
 };
 
 typedef struct _GdkWin32ClipboardStorePrep GdkWin32ClipboardStorePrep;
 
 struct _GdkWin32ClipboardStorePrep
 {
-  GTask             *store_task;
-  GArray            *elements; /* of GdkWin32ClipboardStorePrepElement */
+  GTask  *store_task;
+  GArray *elements; /* of GdkWin32ClipboardStorePrepElement */
 };
 
 typedef struct _GdkWin32ClipboardThreadStore GdkWin32ClipboardThreadStore;
@@ -369,7 +376,7 @@ typedef struct _GdkWin32ClipboardThreadStore GdkWin32ClipboardThreadStore;
 struct _GdkWin32ClipboardThreadStore
 {
   GdkWin32ClipboardThreadQueueItem  parent;
-  GArray                      *elements; /* of GdkWin32ClipboardStorePrepElement */
+  GArray                           *elements; /* of GdkWin32ClipboardStorePrepElement */
 };
 
 typedef struct _GdkWin32ClipboardThreadRender GdkWin32ClipboardThreadRender;
@@ -614,14 +621,14 @@ clipboard_thread_response (gpointer user_data)
 }
 
 static void
-free_prep_element (GdkWin32ClipboardStorePrepElement *el)
+free_store_prep_element (GdkWin32ClipboardStorePrepElement *el)
 {
-  if (el->handle)
+  if (el->clipboard_info.handle)
     {
-      if (_gdk_win32_format_uses_hdata (el->w32format))
-        GlobalFree (el->handle);
+      if (_gdk_win32_format_uses_hdata (el->clipboard_info.w32format))
+        GlobalFree (el->clipboard_info.handle);
       else
-        CloseHandle (el->handle);
+        CloseHandle (el->clipboard_info.handle);
     }
 
   if (el->stream)
@@ -653,7 +660,7 @@ free_queue_item (GdkWin32ClipboardThreadQueueItem *item)
       for (i = 0; i < store->elements->len; i++)
         {
           GdkWin32ClipboardStorePrepElement *el = &g_array_index (store->elements, GdkWin32ClipboardStorePrepElement, i);
-          free_prep_element (el);
+          free_store_prep_element (el);
         }
       g_array_free (store->elements, TRUE);
       break;
@@ -845,9 +852,9 @@ process_store (GdkWin32ClipboardThreadStore *store)
   for (i = 0; i < store->elements->len; i++)
     {
       GdkWin32ClipboardStorePrepElement *el = &g_array_index (store->elements, GdkWin32ClipboardStorePrepElement, i);
-      if (el->handle != NULL && el->w32format != 0)
-        if (SetClipboardData (el->w32format, el->handle))
-          el->handle = NULL; /* the OS now owns the handle, don't free it later on */
+      if (el->clipboard_info.handle != NULL && el->clipboard_info.w32format != 0)
+        if (SetClipboardData (el->clipboard_info.w32format, el->clipboard_info.handle))
+          el->clipboard_info.handle = NULL; /* the OS now owns the handle, don't free it later on */
     }
 
   send_response (store->parent.item_type,
@@ -2848,9 +2855,9 @@ _gdk_win32_retrieve_clipboard_contentformats (GTask             *task,
   return;
 }
 
-typedef struct _GdkWin32ClipboardHDataPrepAndStream GdkWin32ClipboardHDataPrepAndStream;
+typedef struct _GdkWin32ClipboardHDataStorePrepAndStream GdkWin32ClipboardHDataStorePrepAndStream;
 
-struct _GdkWin32ClipboardHDataPrepAndStream
+struct _GdkWin32ClipboardHDataStorePrepAndStream
 {
   GdkWin32ClipboardStorePrep *prep;
   GdkWin32HDataOutputStream  *stream;
@@ -2864,7 +2871,7 @@ clipboard_store_hdata_ready (GObject      *clipboard,
   GError *error = NULL;
   int i;
   gboolean no_other_streams;
-  GdkWin32ClipboardHDataPrepAndStream *prep_and_stream = (GdkWin32ClipboardHDataPrepAndStream *) user_data;
+  GdkWin32ClipboardHDataStorePrepAndStream *prep_and_stream = (GdkWin32ClipboardHDataStorePrepAndStream *) user_data;
   GdkWin32ClipboardStorePrep *prep = prep_and_stream->prep;
   GdkWin32HDataOutputStream  *stream = prep_and_stream->stream;
   GdkWin32ClipboardThreadStore *store;
@@ -2880,7 +2887,7 @@ clipboard_store_hdata_ready (GObject      *clipboard,
       GDK_NOTE(CLIPBOARD, g_printerr ("Failed to write stream: %s\n", error->message));
       g_error_free (error);
       for (i = 0; i < prep->elements->len; i++)
-        free_prep_element (&g_array_index (prep->elements, GdkWin32ClipboardStorePrepElement, i));
+        free_store_prep_element (&g_array_index (prep->elements, GdkWin32ClipboardStorePrepElement, i));
       g_free (prep);
       g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, NULL);
       handle = gdk_win32_hdata_output_stream_get_handle (stream, &is_hdata);
@@ -2902,7 +2909,7 @@ clipboard_store_hdata_ready (GObject      *clipboard,
       if (el->stream == G_OUTPUT_STREAM (stream))
         {
           g_output_stream_close (el->stream, NULL, NULL);
-          el->handle = gdk_win32_hdata_output_stream_get_handle (GDK_WIN32_HDATA_OUTPUT_STREAM (el->stream), NULL);
+          el->clipboard_info.handle = gdk_win32_hdata_output_stream_get_handle (GDK_WIN32_HDATA_OUTPUT_STREAM (el->stream), NULL);
           g_object_unref (el->stream);
           el->stream = NULL;
         }
@@ -2974,21 +2981,21 @@ _gdk_win32_store_clipboard_contentformats (GdkClipboard      *cb,
       if (!el.stream)
         continue;
 
-      el.w32format = pair->w32format;
-      el.contentformat = pair->contentformat;
-      el.handle = NULL;
+      el.clipboard_info.w32format = pair->w32format;
+      el.clipboard_info.contentformat = pair->contentformat;
+      el.clipboard_info.handle = NULL;
       g_array_append_val (prep->elements, el);
     }
 
   for (i = 0; i < prep->elements->len; i++)
     {
       GdkWin32ClipboardStorePrepElement *el = &g_array_index (prep->elements, GdkWin32ClipboardStorePrepElement, i);
-      GdkWin32ClipboardHDataPrepAndStream *prep_and_stream = g_new0 (GdkWin32ClipboardHDataPrepAndStream, 1);
+      GdkWin32ClipboardHDataStorePrepAndStream *prep_and_stream = g_new0 (GdkWin32ClipboardHDataStorePrepAndStream, 1);
       prep_and_stream->prep = prep;
       prep_and_stream->stream = GDK_WIN32_HDATA_OUTPUT_STREAM (el->stream);
 
       gdk_clipboard_write_async (GDK_CLIPBOARD (cb),
-                                 el->contentformat,
+                                 el->clipboard_info.contentformat,
                                  el->stream,
                                  G_PRIORITY_DEFAULT,
                                  NULL,
