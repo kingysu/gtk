@@ -564,8 +564,6 @@ gdk_win32_display_get_name (GdkDisplay *display)
   DWORD session_id;
   char *display_name;
   static const char *display_name_cache = NULL;
-  typedef BOOL (WINAPI *PFN_ProcessIdToSessionId) (DWORD, DWORD *);
-  PFN_ProcessIdToSessionId processIdToSessionId;
 
   g_return_val_if_fail (GDK_IS_DISPLAY (display), NULL);
 
@@ -600,8 +598,7 @@ gdk_win32_display_get_name (GdkDisplay *display)
 	window_station_name = "WinSta0";
     }
 
-  processIdToSessionId = (PFN_ProcessIdToSessionId) GetProcAddress (GetModuleHandle ("kernel32.dll"), "ProcessIdToSessionId");
-  if (!processIdToSessionId || !processIdToSessionId (GetCurrentProcessId (), &session_id))
+  if (!ProcessIdToSessionId (GetCurrentProcessId (), &session_id))
     session_id = 0;
 
   display_name = g_strdup_printf ("%ld\\%s\\%s",
