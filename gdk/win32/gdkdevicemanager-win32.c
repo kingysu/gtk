@@ -71,32 +71,40 @@ static t_WTQueueSizeSet p_WTQueueSizeSet;
 
 static gboolean default_display_opened = FALSE;
 
+
+enum
+{
+  PROP_0,
+  PROP_DISPLAY,
+  NUM_PROPERTIES,
+};
+
 G_DEFINE_TYPE (GdkDeviceManagerWin32, gdk_device_manager_win32, G_TYPE_OBJECT)
 
 static GdkDevice *
-create_pointer (GdkDeviceManagerWin32 *device_manager,
-		GType g_type,
-		const char *name,
+create_pointer (GdkDisplay *display,
+                GType g_type,
+                const char *name,
                 gboolean has_cursor)
 {
   return g_object_new (g_type,
                        "name", name,
                        "source", GDK_SOURCE_MOUSE,
                        "has-cursor", has_cursor,
-                       "display", _gdk_display,
+                       "display", display,
                        NULL);
 }
 
 static GdkDevice *
-create_keyboard (GdkDeviceManagerWin32 *device_manager,
-		 GType g_type,
-		 const char *name)
+create_keyboard (GdkDisplay *display,
+                 GType g_type,
+                 const char *name)
 {
   return g_object_new (g_type,
                        "name", name,
                        "source", GDK_SOURCE_KEYBOARD,
                        "has-cursor", FALSE,
-                       "display", _gdk_display,
+                       "display", display,
                        NULL);
 }
 
@@ -117,6 +125,47 @@ gdk_device_manager_win32_finalize (GObject *object)
 
   G_OBJECT_CLASS (gdk_device_manager_win32_parent_class)->finalize (object);
 }
+
+static void
+gdk_device_manager_win32_set_property (GObject      *object,
+                                       guint         prop_id,
+                                       const GValue *value,
+                                       GParamSpec   *pspec)
+{
+  GdkDeviceManagerWin32 *device_manager = GDK_DEVICE_MANAGER_WIN32 (object);
+
+  switch (prop_id)
+    {
+    case PROP_DISPLAY:
+      g_set_object (&device_manager->display, g_value_get_object (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+    }
+}
+
+static void
+gdk_device_manager_win32_get_property (GObject    *object,
+                                       guint       prop_id,
+                                       GValue     *value,
+                                       GParamSpec *pspec)
+{
+  GdkDeviceManagerWin32 *device_manager = GDK_DEVICE_MANAGER_WIN32 (object);
+
+  switch (prop_id)
+    {
+    case PROP_DISPLAY:
+      g_value_set_object (value, device_manager->display);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+    }
+}
+
 
 #if DEBUG_WINTAB
 
@@ -684,22 +733,26 @@ wintab_default_display_notify_cb (GdkDisplayManager *display_manager)
 static void
 gdk_device_manager_win32_constructed (GObject *object)
 {
+  GdkDisplay *display;
   GdkWin32Display *display_win32;
   GdkDeviceManagerWin32 *device_manager;
   GdkSeat *seat;
   const char *api_preference = NULL;
   gboolean have_api_preference = TRUE;
 
-  display_win32 = GDK_WIN32_DISPLAY (_gdk_display);
-
   device_manager = GDK_DEVICE_MANAGER_WIN32 (object);
+
+  /* we don't currently want an extra ref for the GdkDisplay */
+  display = device_manager->display;
+  display_win32 = GDK_WIN32_DISPLAY (display);
+
   device_manager->core_pointer =
-    create_pointer (device_manager,
+    create_pointer (display,
 		    GDK_TYPE_DEVICE_VIRTUAL,
 		    "Virtual Core Pointer",
                     TRUE);
   device_manager->system_pointer =
-    create_pointer (device_manager,
+    create_pointer (display,
 		    GDK_TYPE_DEVICE_WIN32,
 		    "System Aggregated Pointer",
                     FALSE);
@@ -709,11 +762,11 @@ gdk_device_manager_win32_constructed (GObject *object)
   _gdk_device_add_physical_device (device_manager->core_pointer, device_manager->system_pointer);
 
   device_manager->core_keyboard =
-    create_keyboard (device_manager,
+    create_keyboard (display,
 		     GDK_TYPE_DEVICE_VIRTUAL,
 		     "Virtual Core Keyboard");
   device_manager->system_keyboard =
-    create_keyboard (device_manager,
+    create_keyboard (display,
 		    GDK_TYPE_DEVICE_WIN32,
 		     "System Aggregated Keyboard");
   _gdk_device_virtual_set_active (device_manager->core_keyboard,
@@ -726,7 +779,7 @@ gdk_device_manager_win32_constructed (GObject *object)
 
   seat = gdk_seat_default_new_for_logical_pair (device_manager->core_pointer,
                                                 device_manager->core_keyboard);
-  gdk_display_add_seat (_gdk_display, seat);
+  gdk_display_add_seat (display, seat);
   gdk_seat_default_add_physical_device (GDK_SEAT_DEFAULT (seat), device_manager->system_pointer);
   gdk_seat_default_add_physical_device (GDK_SEAT_DEFAULT (seat), device_manager->system_keyboard);
   g_object_unref (seat);
@@ -786,6 +839,8 @@ gdk_device_manager_win32_constructed (GObject *object)
     }
 }
 
+static GParamSpec *device_manager_props[NUM_PROPERTIES] = { NULL, };
+
 static void
 gdk_device_manager_win32_class_init (GdkDeviceManagerWin32Class *klass)
 {
@@ -793,6 +848,15 @@ gdk_device_manager_win32_class_init (GdkDeviceManagerWin32Class *klass)
 
   object_class->finalize = gdk_device_manager_win32_finalize;
   object_class->constructed = gdk_device_manager_win32_constructed;
+  object_class->get_property = gdk_device_manager_win32_get_property;
+  object_class->set_property = gdk_device_manager_win32_set_property;
+
+  device_manager_props[PROP_DISPLAY] =
+      g_param_spec_object ("display", NULL, NULL,
+                           GDK_TYPE_DISPLAY,
+                           G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
+
+  g_object_class_install_properties (object_class, NUM_PROPERTIES, device_manager_props);
 }
 
 void
