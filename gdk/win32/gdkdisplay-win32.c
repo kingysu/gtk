@@ -429,6 +429,14 @@ inner_display_change_window_procedure (HWND   hwnd,
 {
   switch (message)
     {
+    case WM_CREATE:
+      {
+        CREATESTRUCT *cs = (CREATESTRUCT *)lparam;
+        GdkDisplay *display = (GdkDisplay *)cs->lpCreateParams;
+
+        SetWindowLongPtr (hwnd, GWLP_USERDATA, (LONG_PTR)display);
+        return 0;
+      }
     case WM_DESTROY:
       {
         PostQuitMessage (0);
@@ -436,7 +444,8 @@ inner_display_change_window_procedure (HWND   hwnd,
       }
     case WM_DISPLAYCHANGE:
       {
-        GdkWin32Display *win32_display = GDK_WIN32_DISPLAY (_gdk_display);
+        GdkDisplay *display = (GdkDisplay *) GetWindowLongPtr (hwnd, GWLP_USERDATA);
+        GdkWin32Display *win32_display = GDK_WIN32_DISPLAY (display);
 
         _gdk_win32_screen_on_displaychange_event (GDK_WIN32_SCREEN (win32_display->screen));
         return 0;
@@ -488,7 +497,7 @@ register_display_change_notification (GdkDisplay *display)
       display_win32->hwnd = CreateWindow (MAKEINTRESOURCE (klass),
                                           NULL, WS_POPUP,
                                           0, 0, 0, 0, NULL, NULL,
-                                          _gdk_app_hmodule, NULL);
+                                          _gdk_app_hmodule, display);
       if (!display_win32->hwnd)
         {
           UnregisterClass (MAKEINTRESOURCE (klass), _gdk_app_hmodule);
