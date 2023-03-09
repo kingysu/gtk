@@ -19,7 +19,7 @@
 
 #include "winpointer.h"
 
-gboolean gdk_winpointer_initialize (void);
+gboolean gdk_winpointer_initialize (GdkDisplay *display);
 
 void gdk_winpointer_initialize_surface (GdkSurface *surface);
 void gdk_winpointer_finalize_surface (GdkSurface *surface);

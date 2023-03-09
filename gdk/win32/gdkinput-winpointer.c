@@ -715,8 +715,9 @@ winpointer_get_device_details (HANDLE device,
 }
 
 static void
-winpointer_create_device (POINTER_DEVICE_INFO *info,
-                          GdkInputSource source)
+winpointer_create_device (GdkDisplay          *display,
+                          POINTER_DEVICE_INFO *info,
+                          GdkInputSource       source)
 {
   GdkDeviceWinpointer *device = NULL;
   GdkSeat *seat = NULL;
@@ -730,7 +731,7 @@ winpointer_create_device (POINTER_DEVICE_INFO *info,
   UINT32 num_cursors = 0;
   GdkAxisFlags axes_flags = 0;
 
-  seat = gdk_display_get_default_seat (_gdk_display);
+  seat = gdk_display_get_default_seat (display);
 
   memset (pid, 0, VID_PID_CHARS + 1);
   memset (vid, 0, VID_PID_CHARS + 1);
@@ -779,7 +780,7 @@ winpointer_create_device (POINTER_DEVICE_INFO *info,
     }
 
   device = g_object_new (GDK_TYPE_DEVICE_WINPOINTER,
-                         "display", _gdk_display,
+                         "display", display,
                          "seat", seat,
                          "has-cursor", TRUE,
                          "source", source,
@@ -858,16 +859,17 @@ cleanup:
 }
 
 static void
-winpointer_create_devices (POINTER_DEVICE_INFO *info)
+winpointer_create_devices (GdkDisplay          *display,
+                           POINTER_DEVICE_INFO *info)
 {
   switch (info->pointerDeviceType)
     {
     case POINTER_DEVICE_TYPE_INTEGRATED_PEN:
     case POINTER_DEVICE_TYPE_EXTERNAL_PEN:
-      winpointer_create_device (info, GDK_SOURCE_PEN);
+      winpointer_create_device (display, info, GDK_SOURCE_PEN);
     break;
     case POINTER_DEVICE_TYPE_TOUCH:
-      winpointer_create_device (info, GDK_SOURCE_TOUCHSCREEN);
+      winpointer_create_device (display, info, GDK_SOURCE_TOUCHSCREEN);
     break;
     default:
       g_warn_if_reached ();
@@ -910,7 +912,7 @@ winpointer_find_system_device_in_device_manager (POINTER_DEVICE_INFO *info)
 }
 
 static void
-winpointer_enumerate_devices (void)
+winpointer_enumerate_devices (GdkDisplay *display)
 {
   POINTER_DEVICE_INFO *infos = NULL;
   UINT32 infos_count = 0;
@@ -971,7 +973,7 @@ winpointer_enumerate_devices (void)
     {
       if (!winpointer_find_system_device_in_device_manager (&infos[i]))
         {
-          winpointer_create_devices (&infos[i]);
+          winpointer_create_devices (display, &infos[i]);
         }
     }
 
@@ -986,16 +988,27 @@ winpointer_notifications_window_procedure (HWND hWnd,
 {
   switch (uMsg)
     {
+    case WM_CREATE:
+      {
+        CREATESTRUCT *cs = (CREATESTRUCT *)lParam;
+        GdkDisplay *display = (GdkDisplay *)cs->lpCreateParams;
+
+        SetWindowLongPtr (hWnd, GWLP_USERDATA, (LONG_PTR)display);
+        return 0;
+      }
     case WM_POINTERDEVICECHANGE:
-      winpointer_enumerate_devices ();
-      return 0;
+      {
+        GdkDisplay *display = (GdkDisplay *) GetWindowLongPtr (hWnd, GWLP_USERDATA);
+        winpointer_enumerate_devices (display);
+        return 0;
+      }
     }
 
   return DefWindowProcW (hWnd, uMsg, wParam, lParam);
 }
 
 static gboolean
-winpointer_notif_window_create (void)
+winpointer_notif_window_create (GdkDisplay *display)
 {
   WNDCLASSEXW wndclassex;
 
@@ -1019,7 +1032,7 @@ winpointer_notif_window_create (void)
                                                        HWND_MESSAGE,
                                                        NULL,
                                                        _gdk_dll_hinstance,
-                                                       NULL)))
+                                                       display)))
     {
       WIN32_API_FAILED ("CreateWindowExW");
       return FALSE;
@@ -1082,12 +1095,12 @@ winpointer_ensure_procedures (void)
 }
 
 gboolean
-gdk_winpointer_initialize (void)
+gdk_winpointer_initialize (GdkDisplay *display)
 {
   if (!winpointer_ensure_procedures ())
     return FALSE;
 
-  if (!winpointer_notif_window_create ())
+  if (!winpointer_notif_window_create (display))
     return FALSE;
 
   if (!registerPointerDeviceNotifications (notifications_window_handle, FALSE))
@@ -1098,7 +1111,7 @@ gdk_winpointer_initialize (void)
 
   ignored_interactions = g_ptr_array_new ();
 
-  winpointer_enumerate_devices ();
+  winpointer_enumerate_devices (display);
 
   return TRUE;
 }

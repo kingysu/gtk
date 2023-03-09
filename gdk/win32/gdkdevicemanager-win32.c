@@ -810,7 +810,7 @@ gdk_device_manager_win32_constructed (GObject *object)
 
   if (display_win32->tablet_input_api == GDK_WIN32_TABLET_INPUT_API_WINPOINTER)
     {
-      gboolean init_successful = gdk_winpointer_initialize ();
+      gboolean init_successful = gdk_winpointer_initialize (GDK_DISPLAY (display_win32));
 
       if (!init_successful && !have_api_preference)
         {
