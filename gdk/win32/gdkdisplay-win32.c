@@ -1174,7 +1174,7 @@ gdk_win32_display_get_setting (GdkDisplay  *display,
                                const char *name,
                                GValue      *value)
 {
-  return _gdk_win32_get_setting (name, value);
+  return _gdk_win32_get_setting (display, name, value);
 }
 
 #ifndef EGL_PLATFORM_ANGLE_ANGLE

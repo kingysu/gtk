@@ -402,10 +402,12 @@ GdkDrag *_gdk_win32_surface_drag_begin (GdkSurface         *window,
                                         double              y_root);
 
 /* Stray GdkWin32Screen members */
-gboolean _gdk_win32_get_setting (const char *name, GValue *value);
+gboolean _gdk_win32_get_setting               (GdkDisplay     *display,
+                                               const char     *name,
+                                               GValue         *value);
 void _gdk_win32_screen_on_displaychange_event (GdkWin32Screen *screen);
-GdkSurface *gdk_win32_screen_get_root_window (GdkWin32Screen *screen);
-GdkSurface *gdk_win32_display_get_root_window (GdkDisplay *display);
+GdkSurface *gdk_win32_screen_get_root_window  (GdkWin32Screen *screen);
+GdkSurface *gdk_win32_display_get_root_window (GdkDisplay     *display);
 
 /* Distributed display manager implementation */
 GdkDisplay *_gdk_win32_display_open (const char *display_name);
