@@ -634,11 +634,12 @@ find_window_for_mouse_event (GdkSurface* reported_window,
 }
 
 static GdkModifierType
-build_key_event_state (BYTE *key_state)
+build_key_event_state (GdkDisplay *display,
+                       BYTE       *key_state)
 {
   GdkModifierType state;
   GdkWin32Keymap *keymap;
-  keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (_gdk_display));
+  keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (display));
 
   state = _gdk_win32_keymap_get_mod_mask (keymap);
 
@@ -660,11 +661,11 @@ build_key_event_state (BYTE *key_state)
 }
 
 static guint8
-get_active_group (void)
+get_active_group (GdkDisplay *display)
 {
   GdkWin32Keymap *keymap;
 
-  keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (_gdk_display));
+  keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (display));
 
   return _gdk_win32_keymap_get_active_group (keymap);
 }
@@ -1244,7 +1245,8 @@ synthesize_crossing_events (GdkDisplay                 *display,
 }
 
 static void
-make_crossing_event (GdkDevice *physical_device,
+make_crossing_event (GdkDevice  *physical_device,
+                     GdkDisplay *display,
                      GdkSurface *surface,
                      POINT *screen_pt,
                      guint32 time_)
@@ -1252,7 +1254,7 @@ make_crossing_event (GdkDevice *physical_device,
   GDK_NOTE (EVENTS, g_print (" mouse_window %p -> %p",
                              mouse_window ? GDK_SURFACE_HWND (mouse_window) : NULL,
                              surface ? GDK_SURFACE_HWND (surface) : NULL));
-  synthesize_crossing_events (_gdk_display,
+  synthesize_crossing_events (display,
                               physical_device,
                               mouse_window, surface,
                               GDK_CROSSING_NORMAL,
@@ -1750,6 +1752,7 @@ gdk_event_translate (MSG *msg,
   GdkEvent *event;
 
   GdkDisplay *display;
+  GdkDisplay *surface_display;
   GdkSurface *window = NULL;
   GdkWin32Surface *impl;
   GdkWin32Display *win32_display;
@@ -1793,16 +1796,19 @@ gdk_event_translate (MSG *msg,
 	  exit (msg->wParam);
 	}
       else if (msg->message == WM_CREATE)
-	{
-	  window = (UNALIGNED GdkSurface*) (((LPCREATESTRUCTW) msg->lParam)->lpCreateParams);
-	  GDK_SURFACE_HWND (window) = msg->hwnd;
-	}
+        {
+          window = (UNALIGNED GdkSurface*) (((LPCREATESTRUCTW) msg->lParam)->lpCreateParams);
+          SetWindowLongPtr (msg->hwnd, GWLP_USERDATA, (LONG_PTR)gdk_surface_get_display (window));
+          GDK_SURFACE_HWND (window) = msg->hwnd;
+        }
       else
 	{
 	  GDK_NOTE (EVENTS, g_print (" (no GdkSurface)"));
 	}
       return FALSE;
     }
+
+  surface_display = (GdkDisplay *)GetWindowLongPtr (msg->hwnd, GWLP_USERDATA);
 
   device_manager_win32 = GDK_DEVICE_MANAGER_WIN32 (_gdk_device_manager);
 
@@ -1831,7 +1837,7 @@ gdk_event_translate (MSG *msg,
         GdkWin32Keymap *win32_keymap;
         GdkTranslatedKey translated;
 
-        win32_keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (_gdk_display));
+        win32_keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (surface_display));
 
         _gdk_input_locale = (HKL) msg->lParam;
         _gdk_win32_keymap_set_active_layout (win32_keymap, _gdk_input_locale);
@@ -1994,8 +2000,8 @@ gdk_event_translate (MSG *msg,
                        msg->wParam == VK_SHIFT ||
                        msg->wParam == VK_MENU);
 
-        state = build_key_event_state (key_state);
-        group = get_active_group ();
+        state = build_key_event_state (surface_display, key_state);
+        group = get_active_group (surface_display);
 
         gdk_keymap_translate_keyboard_state ((GdkKeymap*) win32_keymap, keycode, state, group,
                                              &keyval, &effective_group, &level, &consumed);
@@ -2132,14 +2138,14 @@ gdk_event_translate (MSG *msg,
             /* Build a key press event */
             translated.keyval = gdk_unicode_to_keyval (wbuf[i]);
             translated.consumed = 0;
-            translated.layout = get_active_group ();
+            translated.layout = get_active_group (surface_display);
             translated.level = 0;
             event = gdk_key_event_new (GDK_KEY_PRESS,
                                        window,
                                        device_manager_win32->core_keyboard,
                                        _gdk_win32_get_next_tick (msg->time),
                                        0,
-                                       build_key_event_state (key_state),
+                                       build_key_event_state (surface_display, key_state),
                                        FALSE,
                                        &translated,
                                        &translated,
@@ -2153,7 +2159,7 @@ gdk_event_translate (MSG *msg,
                                        device_manager_win32->core_keyboard,
                                        _gdk_win32_get_next_tick (msg->time),
                                        0,
-                                       build_key_event_state (key_state),
+                                       build_key_event_state (surface_display, key_state),
                                        FALSE,
                                        &translated,
                                        &translated,
@@ -2562,6 +2568,7 @@ gdk_event_translate (MSG *msg,
           if (gdk_winpointer_get_message_info (msg, &event_device, &event_time))
             {
               make_crossing_event(event_device,
+                                  display,
                                   NULL,
                                   &pen_touch_cursor_position,
                                   event_time);
@@ -2629,6 +2636,7 @@ gdk_event_translate (MSG *msg,
           if (gdk_winpointer_get_message_info (msg, &event_device, &event_time))
             {
               make_crossing_event(event_device,
+                                  display,
                                   NULL,
                                   &pen_touch_cursor_position,
                                   event_time);

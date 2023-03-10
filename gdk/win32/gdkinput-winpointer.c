@@ -463,7 +463,11 @@ gdk_winpointer_input_events (GdkSurface *surface,
             POINT screen_pt = infos[h].pointerInfo.ptPixelLocation;
             guint32 event_time = winpointer_get_time (msg, &infos[h].pointerInfo);
 
-            crossing_cb(GDK_DEVICE (device), surface, &screen_pt, event_time);
+            crossing_cb(GDK_DEVICE (device),
+                        gdk_surface_get_display (surface),
+                        surface,
+                       &screen_pt,
+                        event_time);
           }
 
         do
@@ -509,7 +513,11 @@ gdk_winpointer_input_events (GdkSurface *surface,
             POINT screen_pt = infos[h].pointerInfo.ptPixelLocation;
             guint32 event_time = winpointer_get_time (msg, &infos[h].pointerInfo);
 
-            crossing_cb(GDK_DEVICE (device), surface, &screen_pt, event_time);
+            crossing_cb (GDK_DEVICE (device),
+                         gdk_surface_get_display (surface),
+                         surface,
+                        &screen_pt,
+                         event_time);
           }
 
         do

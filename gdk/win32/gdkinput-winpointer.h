@@ -25,7 +25,8 @@ void gdk_winpointer_initialize_surface (GdkSurface *surface);
 void gdk_winpointer_finalize_surface (GdkSurface *surface);
 
 typedef void
-(*crossing_cb_t)(GdkDevice *physical_device,
+(*crossing_cb_t)(GdkDevice  *physical_device,
+                 GdkDisplay *display,
                  GdkSurface *surface,
                  POINT *screen_pt,
                  guint32 time_);
