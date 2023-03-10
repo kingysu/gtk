@@ -693,7 +693,7 @@ _gdk_win32_keymap_get_active_group (GdkWin32Keymap *keymap)
 GdkKeymap*
 _gdk_win32_display_get_keymap (GdkDisplay *display)
 {
-  g_return_val_if_fail (display == gdk_display_get_default (), NULL);
+  g_return_val_if_fail (GDK_IS_DISPLAY (display), NULL);
 
   if (default_keymap == NULL)
     default_keymap = g_object_new (gdk_win32_keymap_get_type (), NULL);

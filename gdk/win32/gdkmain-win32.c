@@ -57,11 +57,11 @@ static gboolean co_initialized = FALSE;
 static gboolean ole_initialized = FALSE;
 
 void
-_gdk_win32_surfaceing_init (void)
+_gdk_win32_surfaceing_init (GdkDisplay *display)
 {
   GdkWin32Keymap *win32_keymap;
 
-  win32_keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (_gdk_display));
+  win32_keymap = GDK_WIN32_KEYMAP (_gdk_win32_display_get_keymap (display));
 
   if (gdk_synchronize)
     GdiSetBatchLimit (1);

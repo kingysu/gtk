@@ -27,7 +27,6 @@
 #include "gdktypes.h"
 #include "gdkprivate-win32.h"
 
-GdkDisplay	 *_gdk_display = NULL;
 GdkDeviceManagerWin32 *_gdk_device_manager = NULL;
 
 HDC		  _gdk_display_hdc;

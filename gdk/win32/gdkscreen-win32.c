@@ -31,7 +31,6 @@ struct _GdkWin32Screen
   GObject parent_instance;
 
   int width, height;
-  int surface_scale;
 };
 
 struct _GdkWin32ScreenClass
@@ -41,16 +40,13 @@ struct _GdkWin32ScreenClass
 
 G_DEFINE_TYPE (GdkWin32Screen, gdk_win32_screen, G_TYPE_OBJECT)
 
-static void
-init_root_window_size (GdkWin32Screen *screen)
+void
+_gdk_win32_screen_init_root_window_size (GdkWin32Screen *screen,
+                                         GListModel     *monitors)
 {
   GdkRectangle result = { 0, };
   int i;
-  GdkDisplay *display = _gdk_display;
-  GListModel *monitors;
   GdkMonitor *monitor;
-
-  monitors = gdk_display_get_monitors (display);
 
   for (i = 1; i < g_list_model_get_n_items (monitors); i++)
   {
@@ -67,34 +63,8 @@ init_root_window_size (GdkWin32Screen *screen)
 }
 
 static void
-init_root_window (GdkWin32Screen *screen_win32)
-{
-  GdkWin32Display *win32_display;
-
-  init_root_window_size (screen_win32);
-
-  win32_display = GDK_WIN32_DISPLAY (_gdk_display);
-
-  if (win32_display->dpi_aware_type != PROCESS_DPI_UNAWARE)
-    screen_win32->surface_scale = gdk_win32_display_get_monitor_scale_factor (win32_display,
-                                                                              NULL,
-                                                                              NULL);
-  else
-    screen_win32->surface_scale = 1;
-}
-
-static void
 gdk_win32_screen_init (GdkWin32Screen *win32_screen)
 {
-  _gdk_win32_display_init_monitors (GDK_WIN32_DISPLAY (_gdk_display));
-  init_root_window (win32_screen);
-}
-
-void
-_gdk_win32_screen_on_displaychange_event (GdkWin32Screen *screen)
-{
-  _gdk_win32_display_init_monitors (GDK_WIN32_DISPLAY (_gdk_display));
-  init_root_window_size (screen);
 }
 
 static void

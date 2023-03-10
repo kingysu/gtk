@@ -482,7 +482,7 @@ _gdk_win32_display_create_surface (GdkDisplay     *display,
   int real_x = 0, real_y = 0;
   GdkFrameClock *frame_clock;
 
-  g_return_val_if_fail (display == _gdk_display, NULL);
+  g_return_val_if_fail (GDK_IS_DISPLAY (display), NULL);
 
   GDK_NOTE (MISC,
             g_print ("_gdk_surface_new: %s\n", (surface_type == GDK_SURFACE_TOPLEVEL ? "TOPLEVEL" :

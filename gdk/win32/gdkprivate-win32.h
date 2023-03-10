@@ -281,8 +281,6 @@ void    _gdk_other_api_failed        (const char *where,
 
 extern LRESULT CALLBACK _gdk_win32_surface_procedure (HWND, UINT, WPARAM, LPARAM);
 
-extern GdkDisplay       *_gdk_display;
-
 extern GdkDeviceManagerWin32 *_gdk_device_manager;
 
 extern HDC               _gdk_display_hdc;
@@ -405,7 +403,8 @@ GdkDrag *_gdk_win32_surface_drag_begin (GdkSurface         *window,
 gboolean _gdk_win32_get_setting               (GdkDisplay     *display,
                                                const char     *name,
                                                GValue         *value);
-void _gdk_win32_screen_on_displaychange_event (GdkWin32Screen *screen);
+void _gdk_win32_screen_init_root_window_size  (GdkWin32Screen *screen,
+                                               GListModel     *monitors);
 GdkSurface *gdk_win32_screen_get_root_window  (GdkWin32Screen *screen);
 GdkSurface *gdk_win32_display_get_root_window (GdkDisplay     *display);
 
@@ -445,7 +444,7 @@ BOOL WINAPI GtkShowWindow (GdkSurface *window,
                            int        cmd_show);
 
 /* Initialization */
-void _gdk_win32_surfaceing_init (void);
+void _gdk_win32_surfaceing_init (GdkDisplay *display);
 void _gdk_drag_init    (void);
 void _gdk_events_init (GdkDisplay *display);
 
