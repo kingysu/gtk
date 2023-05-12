@@ -1053,6 +1053,7 @@ gdk_display_create_vulkan_device (GdkDisplay  *display,
 
               device_extensions = g_ptr_array_new ();
               g_ptr_array_add (device_extensions, (gpointer) VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+              g_ptr_array_add (device_extensions, (gpointer) VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
               if (has_incremental_present)
                 g_ptr_array_add (device_extensions, (gpointer) VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME);
 
