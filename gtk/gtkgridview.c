@@ -913,6 +913,40 @@ gtk_grid_view_split_tiles_by_columns (GtkListItemManager *items,
             }
         }
     }
+
+#ifdef G_ENABLE_DEBUG
+  /* Verify some invariants:
+   * - there are no removed tiles left
+   * - multirow tiles start in column 0
+   * - non-multirow tiles are contained in one row
+   */
+  for (tile = gtk_list_item_manager_get_first (items);
+       tile != NULL;
+       tile = gtk_rb_tree_node_get_next (tile))
+    {
+      g_assert (tile->type != GTK_LIST_TILE_REMOVED);
+      if (tile->n_items > 1)
+        {
+          unsigned int pos, col, col2, end;
+
+          pos = gtk_list_tile_get_position (items, tile);
+          col = gtk_grid_view_get_column_for_position (items, n_columns, pos);
+          col2 = gtk_grid_view_get_column_for_position (items, n_columns, pos + tile->n_items - 1);
+          gtk_grid_view_get_section_for_position (items, pos + tile->n_items - 1, NULL, &end);
+
+          if (gtk_grid_view_is_multirow_tile (items, n_columns, tile))
+            {
+              g_assert_true (col == 0);
+              g_assert_true (col2 == n_columns - 1 || pos + tile->n_items == end);
+            }
+          else
+            {
+              g_assert_true (col2 == col + tile->n_items - 1);
+              g_assert_true (col2 <= n_columns);
+            }
+        }
+    }
+#endif
 }
 
 static void
