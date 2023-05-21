@@ -3954,32 +3954,21 @@ gsk_repeat_node_draw (GskRenderNode *node,
 {
   GskRepeatNode *self = (GskRepeatNode *) node;
   cairo_pattern_t *pattern;
-  cairo_surface_t *surface;
-  cairo_t *surface_cr;
 
-  surface = cairo_surface_create_similar (cairo_get_target (cr),
-                                          CAIRO_CONTENT_COLOR_ALPHA,
-                                          ceilf (self->child_bounds.size.width),
-                                          ceilf (self->child_bounds.size.height));
-  surface_cr = cairo_create (surface);
-  cairo_translate (surface_cr,
-                   - self->child_bounds.origin.x,
-                   - self->child_bounds.origin.y);
-  gsk_render_node_draw (self->child, surface_cr);
-  cairo_destroy (surface_cr);
+  cairo_save (cr);
+  cairo_reset_clip (cr);
+  gsk_cairo_rectangle (cr, &self->child_bounds);
+  cairo_clip (cr);
+  gsk_cairo_rectangle (cr, &node->bounds);
+  cairo_clip (cr);
+  cairo_push_group (cr);
+  gsk_render_node_draw (self->child, cr);
+  pattern = cairo_pop_group (cr);
+  cairo_restore (cr);
 
-  pattern = cairo_pattern_create_for_surface (surface);
   cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
-  cairo_pattern_set_matrix (pattern,
-                            &(cairo_matrix_t) {
-                                .xx = 1.0,
-                                .yy = 1.0,
-                                .x0 = - self->child_bounds.origin.x,
-                                .y0 = - self->child_bounds.origin.y
-                            });
   cairo_set_source (cr, pattern);
   cairo_pattern_destroy (pattern);
-  cairo_surface_destroy (surface);
 
   gsk_cairo_rectangle (cr, &node->bounds);
   cairo_fill (cr);
