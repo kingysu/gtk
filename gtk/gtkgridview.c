@@ -95,6 +95,12 @@ struct _GtkGridView
   /* set in size_allocate */
   guint n_columns;
   double column_width;
+
+  /* for debugging between get_position_from_allocation and size_allocate */
+  unsigned int anchor_position;
+  unsigned int anchor_column;
+  unsigned int anchor_n_columns;
+  gboolean anchor_has_sections;
 };
 
 struct _GtkGridViewClass
@@ -530,6 +536,11 @@ gtk_grid_view_get_position_from_allocation (GtkListBase           *base,
       if (area)
         *area = tile->area;
     }
+
+  self->anchor_position = pos;
+  self->anchor_column = col;
+  self->anchor_n_columns = self->n_columns;
+  self->anchor_has_sections = gtk_list_item_manager_get_has_sections (self->item_manager);
 
   *position = pos;
 
@@ -1025,23 +1036,36 @@ gtk_grid_view_size_allocate (GtkWidget *widget,
                                          - column_start (self, xspacing, 0),
                                          0);
         }
-      else if (gtk_grid_view_is_multirow_tile (self->item_manager, self->n_columns, tile))
-        {
-          g_assert (i == 0);
-          gtk_list_tile_set_area_size (self->item_manager,
-                                       tile,
-                                       column_end (self, xspacing, self->n_columns - 1)
-                                       - column_start (self, xspacing, 0),
-                                       (unknown_row_height + yspacing) * (tile->n_items / self->n_columns) - yspacing);
-          y += tile->area.height + yspacing;
-        }
       else
         {
-          gtk_list_tile_set_area_size (self->item_manager,
-                                       tile,
-                                       column_end (self, xspacing, i + tile->n_items - 1) - tile->area.x,
-                                       unknown_row_height);
-          i += tile->n_items;
+          if (gtk_list_tile_get_position (self->item_manager, tile) == self->anchor_position &&
+              i != self->anchor_column)
+            {
+              g_print ("BAD: anchor column mismatch (anchor %u, column %u != %u, n_columns %u vs %u, sections %d vs %d)\n",
+                       self->anchor_position,
+                       self->anchor_column, i,
+                       self->anchor_n_columns, self->n_columns,
+                       self->anchor_has_sections, gtk_list_item_manager_get_has_sections (self->item_manager));
+            }
+
+          if (gtk_grid_view_is_multirow_tile (self->item_manager, self->n_columns, tile))
+            {
+              g_assert (i == 0);
+              gtk_list_tile_set_area_size (self->item_manager,
+                                           tile,
+                                           column_end (self, xspacing, self->n_columns - 1)
+                                           - column_start (self, xspacing, 0),
+                                           (unknown_row_height + yspacing) * (tile->n_items / self->n_columns) - yspacing);
+              y += tile->area.height + yspacing;
+            }
+          else
+            {
+              gtk_list_tile_set_area_size (self->item_manager,
+                                           tile,
+                                           column_end (self, xspacing, i + tile->n_items - 1) - tile->area.x,
+                                           unknown_row_height);
+              i += tile->n_items;
+            }
         }
 
       if (i >= self->n_columns)
