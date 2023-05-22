@@ -240,10 +240,7 @@ toggle_cb (GtkCheckButton *check, GtkWidget *list)
       g_signal_connect (header_factory, "bind", G_CALLBACK (bind_header), NULL);
     }
 
-  if (GTK_IS_LIST_VIEW (list))
-    gtk_list_view_set_header_factory (GTK_LIST_VIEW (list), header_factory);
-  else
-    gtk_grid_view_set_header_factory (GTK_GRID_VIEW (list), header_factory);
+  g_object_set (list, "header-factory", header_factory, NULL);
 
   g_clear_object (&header_factory);
 }
@@ -376,6 +373,8 @@ main (int argc, char *argv[])
   gtk_column_view_column_set_expand (column, TRUE);
   gtk_column_view_column_set_resizable (column, TRUE);
   g_object_unref (column);
+
+  g_signal_connect (toggle, "toggled", G_CALLBACK (toggle_cb), cv);
 
   gtk_window_present (GTK_WINDOW (window));
 
