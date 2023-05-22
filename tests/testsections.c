@@ -49,6 +49,12 @@ reverse_word (const char *word)
   return g_string_free (s, FALSE);
 }
 
+static char *
+get_reverse (GObject *this)
+{
+  return reverse_word (gtk_string_object_get_string (GTK_STRING_OBJECT (this)));
+}
+
 static void
 bind_item_reverse (GtkSignalListItemFactory *self,
                    GObject                  *object)
@@ -58,7 +64,7 @@ bind_item_reverse (GtkSignalListItemFactory *self,
   GtkWidget *child = gtk_list_item_get_child (list_item);
   char *word;
 
-  word = reverse_word (gtk_string_object_get_string (GTK_STRING_OBJECT (item)));
+  word = get_reverse (item);
   gtk_label_set_label (GTK_LABEL (child), word);
   g_free (word);
 }
@@ -270,6 +276,7 @@ main (int argc, char *argv[])
   GtkStringList *stringlist;
   GtkAdjustment *adj;
   GtkColumnViewColumn *column;
+  GtkSorter *sorter;
 
   stringlist = gtk_string_list_new (NULL);
 
@@ -307,7 +314,7 @@ main (int argc, char *argv[])
   gtk_stack_switcher_set_stack (GTK_STACK_SWITCHER (switcher), GTK_STACK (stack));
 
   expression = gtk_property_expression_new (GTK_TYPE_STRING_OBJECT, NULL, "string");
-  sortmodel = gtk_sort_list_model_new (G_LIST_MODEL (stringlist),
+  sortmodel = gtk_sort_list_model_new (G_LIST_MODEL (g_object_ref (stringlist)),
                                        GTK_SORTER (gtk_string_sorter_new (expression)));
   expression = gtk_cclosure_expression_new (G_TYPE_STRING, NULL, 0, NULL, (GCallback) get_first, NULL, NULL);
   gtk_sort_list_model_set_section_sorter (sortmodel, GTK_SORTER (gtk_string_sorter_new (expression)));
@@ -346,22 +353,38 @@ main (int argc, char *argv[])
   adj = gtk_scrolled_window_get_hadjustment (GTK_SCROLLED_WINDOW (sw));
   g_signal_connect (adj, "value-changed", G_CALLBACK (value_changed_cb), NULL);
 
+  g_object_unref (selection);
+
   /* columns */
 
   sw = gtk_scrolled_window_new ();
   gtk_stack_add_titled (GTK_STACK (stack), sw, "columns", "Columns");
 
-  cv = gtk_column_view_new (g_object_ref (selection));
+  sortmodel = gtk_sort_list_model_new (G_LIST_MODEL (g_object_ref (stringlist)), NULL);
+  selection = GTK_SELECTION_MODEL (gtk_no_selection_new (G_LIST_MODEL (g_object_ref (sortmodel))));
+
+  cv = gtk_column_view_new (selection);
   gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (sw), cv);
+
+  gtk_sort_list_model_set_sorter (sortmodel, gtk_column_view_get_sorter (GTK_COLUMN_VIEW (cv)));
+  expression = gtk_cclosure_expression_new (G_TYPE_STRING, NULL, 0, NULL, (GCallback) get_first, NULL, NULL);
+  gtk_sort_list_model_set_section_sorter (sortmodel, GTK_SORTER (gtk_string_sorter_new (expression)));
 
   factory = gtk_signal_list_item_factory_new ();
   g_signal_connect (factory, "setup", G_CALLBACK (setup_item), NULL);
   g_signal_connect (factory, "bind", G_CALLBACK (bind_item), NULL);
 
   column = gtk_column_view_column_new ("Word", factory);
-  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
   gtk_column_view_column_set_expand (column, TRUE);
   gtk_column_view_column_set_resizable (column, TRUE);
+
+  expression = gtk_property_expression_new (GTK_TYPE_STRING_OBJECT, NULL, "string");
+  sorter = GTK_SORTER (gtk_string_sorter_new (expression));
+
+  gtk_column_view_column_set_sorter (column, sorter);
+  g_object_unref (sorter);
+
+  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
   g_object_unref (column);
 
   factory = gtk_signal_list_item_factory_new ();
@@ -369,9 +392,16 @@ main (int argc, char *argv[])
   g_signal_connect (factory, "bind", G_CALLBACK (bind_item_reverse), NULL);
 
   column = gtk_column_view_column_new ("Reverse", factory);
-  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
   gtk_column_view_column_set_expand (column, TRUE);
   gtk_column_view_column_set_resizable (column, TRUE);
+
+  expression = gtk_cclosure_expression_new (G_TYPE_STRING, NULL, 0, NULL, (GCallback) get_reverse, NULL, NULL);
+  sorter = GTK_SORTER (gtk_string_sorter_new (expression));
+
+  gtk_column_view_column_set_sorter (column, sorter);
+  g_object_unref (sorter);
+
+  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
   g_object_unref (column);
 
   g_signal_connect (toggle, "toggled", G_CALLBACK (toggle_cb), cv);
@@ -383,7 +413,8 @@ main (int argc, char *argv[])
   while (g_list_model_get_n_items (gtk_window_get_toplevels ()) > 0)
     g_main_context_iteration (NULL, FALSE);
 
-  g_object_unref (selection);
+  g_object_unref (stringlist);
+  g_object_unref (sortmodel);
 
   return 0;
 }
