@@ -23,6 +23,46 @@ bind_item (GtkSignalListItemFactory *self,
                        gtk_string_object_get_string (GTK_STRING_OBJECT (item)));
 }
 
+static char *
+reverse_word (const char *word)
+{
+  GString *s = g_string_new ("");
+  const char *p;
+  gunichar c;
+  gboolean capitalize;
+
+  capitalize = g_unichar_isupper (g_utf8_get_char (word));
+
+  p = word + strlen (word);
+  while ((p = g_utf8_find_prev_char (word, p)) != NULL)
+    {
+      c = g_utf8_get_char (p);
+
+      if (s->len == 0 && capitalize)
+        c = g_unichar_toupper (c);
+      else
+        c = g_unichar_tolower (c);
+
+      g_string_append_unichar (s, c);
+    }
+
+  return g_string_free (s, FALSE);
+}
+
+static void
+bind_item_reverse (GtkSignalListItemFactory *self,
+                   GObject                  *object)
+{
+  GtkListItem *list_item = GTK_LIST_ITEM (object);
+  GObject *item = gtk_list_item_get_item (list_item);
+  GtkWidget *child = gtk_list_item_get_child (list_item);
+  char *word;
+
+  word = reverse_word (gtk_string_object_get_string (GTK_STRING_OBJECT (item)));
+  gtk_label_set_label (GTK_LABEL (child), word);
+  g_free (word);
+}
+
 static void
 setup_header (GtkSignalListItemFactory *self,
               GObject                  *object)
@@ -221,6 +261,7 @@ main (int argc, char *argv[])
   GtkWidget *sw;
   GtkWidget *lv;
   GtkWidget *gv;
+  GtkWidget *cv;
   GtkWidget *header;
   GtkWidget *toggle;
   GtkWidget *switcher;
@@ -231,6 +272,7 @@ main (int argc, char *argv[])
   GtkSelectionModel *selection;
   GtkStringList *stringlist;
   GtkAdjustment *adj;
+  GtkColumnViewColumn *column;
 
   stringlist = gtk_string_list_new (NULL);
 
@@ -274,6 +316,8 @@ main (int argc, char *argv[])
   gtk_sort_list_model_set_section_sorter (sortmodel, GTK_SORTER (gtk_string_sorter_new (expression)));
   selection = GTK_SELECTION_MODEL (gtk_no_selection_new (G_LIST_MODEL (sortmodel)));
 
+  /* list */
+
   sw = gtk_scrolled_window_new ();
   gtk_stack_add_titled (GTK_STACK (stack), sw, "list", "List");
 
@@ -285,6 +329,8 @@ main (int argc, char *argv[])
   gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (sw), lv);
 
   g_signal_connect (toggle, "toggled", G_CALLBACK (toggle_cb), lv);
+
+  /* grid */
 
   sw = gtk_scrolled_window_new ();
   gtk_stack_add_titled (GTK_STACK (stack), sw, "grid", "Grid");
@@ -302,6 +348,34 @@ main (int argc, char *argv[])
 
   adj = gtk_scrolled_window_get_hadjustment (GTK_SCROLLED_WINDOW (sw));
   g_signal_connect (adj, "value-changed", G_CALLBACK (value_changed_cb), NULL);
+
+  /* columns */
+
+  sw = gtk_scrolled_window_new ();
+  gtk_stack_add_titled (GTK_STACK (stack), sw, "columns", "Columns");
+
+  cv = gtk_column_view_new (g_object_ref (selection));
+  gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (sw), cv);
+
+  factory = gtk_signal_list_item_factory_new ();
+  g_signal_connect (factory, "setup", G_CALLBACK (setup_item), NULL);
+  g_signal_connect (factory, "bind", G_CALLBACK (bind_item), NULL);
+
+  column = gtk_column_view_column_new ("Word", factory);
+  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
+  gtk_column_view_column_set_expand (column, TRUE);
+  gtk_column_view_column_set_resizable (column, TRUE);
+  g_object_unref (column);
+
+  factory = gtk_signal_list_item_factory_new ();
+  g_signal_connect (factory, "setup", G_CALLBACK (setup_item), NULL);
+  g_signal_connect (factory, "bind", G_CALLBACK (bind_item_reverse), NULL);
+
+  column = gtk_column_view_column_new ("Reverse", factory);
+  gtk_column_view_append_column (GTK_COLUMN_VIEW (cv), column);
+  gtk_column_view_column_set_expand (column, TRUE);
+  gtk_column_view_column_set_resizable (column, TRUE);
+  g_object_unref (column);
 
   gtk_window_present (GTK_WINDOW (window));
 
