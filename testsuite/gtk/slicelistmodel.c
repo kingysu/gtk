@@ -380,6 +380,103 @@ test_bug_skip_amount (void)
   g_object_unref (slice);
 }
 
+static int
+sort_func (gconstpointer p1,
+           gconstpointer p2,
+           gpointer      data)
+{
+  const char *s1 = gtk_string_object_get_string ((GtkStringObject *)p1);
+  const char *s2 = gtk_string_object_get_string ((GtkStringObject *)p2);
+
+  /* compare just the first byte */
+  return (int)(s1[0]) - (int)(s2[0]);
+}
+
+static void
+sections_changed (GtkSectionModel *model,
+                  unsigned int     start,
+                  unsigned int     end,
+                  gpointer         user_data)
+{
+  gboolean *got_it = user_data;
+
+  *got_it = TRUE;
+}
+
+static void
+test_sections (void)
+{
+    GtkStringList *list;
+  const char *strings[] = {
+    "aaa",
+    "aab",
+    "abc",
+    "bbb",
+    "bq1",
+    "bq2",
+    "cc",
+    "cx",
+    NULL
+  };
+  GtkSorter *sorter;
+  GtkSortListModel *sorted;
+  GtkSorter *section_sorter;
+  guint s, e;
+  GtkSliceListModel *slice;
+  gboolean got_it;
+
+  list = gtk_string_list_new (strings);
+  sorter = GTK_SORTER (gtk_string_sorter_new (gtk_property_expression_new (GTK_TYPE_STRING_OBJECT, NULL, "string")));
+  sorted = gtk_sort_list_model_new (G_LIST_MODEL (list), sorter);
+  section_sorter = GTK_SORTER (gtk_custom_sorter_new (sort_func, NULL, NULL));
+  gtk_sort_list_model_set_section_sorter (GTK_SORT_LIST_MODEL (sorted), section_sorter);
+  g_object_unref (section_sorter);
+
+  slice = gtk_slice_list_model_new (G_LIST_MODEL (sorted), 0, 8);
+
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 0, &s, &e);
+  g_assert_cmpint (s, ==, 0);
+  g_assert_cmpint (e, ==, 3);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 3, &s, &e);
+  g_assert_cmpint (s, ==, 3);
+  g_assert_cmpint (e, ==, 6);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 6, &s, &e);
+  g_assert_cmpint (s, ==, 6);
+  g_assert_cmpint (e, ==, 8);
+
+  gtk_slice_list_model_set_size (slice, 5);
+
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 0, &s, &e);
+  g_assert_cmpint (s, ==, 0);
+  g_assert_cmpint (e, ==, 3);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 3, &s, &e);
+  g_assert_cmpint (s, ==, 3);
+  g_assert_cmpint (e, ==, 5);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 6, &s, &e);
+  g_assert_cmpint (s, ==, 5);
+  g_assert_cmpint (e, ==, G_MAXUINT);
+
+  gtk_slice_list_model_set_offset (slice, 2);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 0, &s, &e);
+  g_assert_cmpint (s, ==, 0);
+  g_assert_cmpint (e, ==, 1);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 1, &s, &e);
+  g_assert_cmpint (s, ==, 1);
+  g_assert_cmpint (e, ==, 4);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 4, &s, &e);
+  g_assert_cmpint (s, ==, 4);
+  g_assert_cmpint (e, ==, 5);
+  gtk_section_model_get_section (GTK_SECTION_MODEL (slice), 5, &s, &e);
+  g_assert_cmpint (s, ==, 5);
+  g_assert_cmpint (e, ==, G_MAXUINT);
+
+  g_signal_connect (slice, "sections-changed", G_CALLBACK (sections_changed), &got_it);
+  gtk_sort_list_model_set_section_sorter (GTK_SORT_LIST_MODEL (sorted), NULL);
+  g_assert_true (got_it);
+
+  g_object_unref (slice);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -396,6 +493,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/slicelistmodel/changes", test_changes);
   g_test_add_func ("/slicelistmodel/bug/added_equals_removed", test_bug_added_equals_removed);
   g_test_add_func ("/slicelistmodel/bug/skip_amount", test_bug_skip_amount);
+  g_test_add_func ("/slicelistmodel/sections", test_sections);
 
   return g_test_run ();
 }
