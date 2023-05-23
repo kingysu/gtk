@@ -23,6 +23,8 @@ bind_item (GtkSignalListItemFactory *self,
                        gtk_string_object_get_string (GTK_STRING_OBJECT (item)));
 }
 
+static gboolean aa = FALSE;
+
 static void
 setup_header (GtkSignalListItemFactory *self,
               GObject                  *object)
@@ -38,11 +40,20 @@ static char *
 get_first (GObject *this)
 {
   const char *s = gtk_string_object_get_string (GTK_STRING_OBJECT (this));
-  char buffer[6] = { 0, };
+  GString *str;
 
-  g_unichar_to_utf8 (g_unichar_toupper (g_utf8_get_char (s)), buffer);
+  str = g_string_new ("");
 
-  return g_strdup (buffer);
+  g_string_append_unichar (str, g_unichar_toupper (g_utf8_get_char (s)));
+  if (aa)
+    {
+      s = g_utf8_next_char (s);
+      if (*s)
+        g_string_append_unichar (str, g_unichar_toupper (g_utf8_get_char (s)));
+    }
+
+
+  return g_string_free (str, FALSE);
 }
 
 static void
@@ -209,6 +220,25 @@ toggle_cb (GtkCheckButton *check, GtkWidget *list)
 }
 
 static void
+toggle2_cb (GtkCheckButton *check, GtkWidget *list)
+{
+  GtkSelectionModel *selection;
+  GtkSortListModel *sortmodel;
+  GtkExpression *expression;
+
+  aa = !aa;
+
+  expression = gtk_cclosure_expression_new (G_TYPE_STRING, NULL, 0, NULL, (GCallback) get_first, NULL, NULL);
+
+  selection = gtk_list_view_get_model (GTK_LIST_VIEW (list));
+  g_object_get (selection, "model", &sortmodel, NULL);
+
+  gtk_sort_list_model_set_section_sorter (sortmodel, GTK_SORTER (gtk_string_sorter_new (expression)));
+
+  g_object_unref (sortmodel);
+}
+
+static void
 value_changed_cb (GtkAdjustment *adj, gpointer data)
 {
   g_print ("horizontal adjustment changed to %f\n",  gtk_adjustment_get_value (adj));
@@ -223,6 +253,7 @@ main (int argc, char *argv[])
   GtkWidget *gv;
   GtkWidget *header;
   GtkWidget *toggle;
+  GtkWidget *toggle2;
   GtkWidget *switcher;
   GtkWidget *stack;
   GtkListItemFactory *factory;
@@ -255,9 +286,13 @@ main (int argc, char *argv[])
   header = gtk_header_bar_new ();
   gtk_window_set_titlebar (GTK_WINDOW (window), header);
 
-  toggle = gtk_check_button_new ();
+  toggle = gtk_check_button_new_with_label ("Sections");
   gtk_widget_set_valign (toggle, GTK_ALIGN_CENTER);
   gtk_header_bar_pack_start (GTK_HEADER_BAR (header), toggle);
+
+  toggle2 = gtk_check_button_new_with_label ("Aa");
+  gtk_widget_set_valign (toggle, GTK_ALIGN_CENTER);
+  gtk_header_bar_pack_start (GTK_HEADER_BAR (header), toggle2);
 
   stack = gtk_stack_new ();
   gtk_window_set_child (GTK_WINDOW (window), stack);
@@ -285,6 +320,7 @@ main (int argc, char *argv[])
   gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (sw), lv);
 
   g_signal_connect (toggle, "toggled", G_CALLBACK (toggle_cb), lv);
+  g_signal_connect (toggle2, "toggled", G_CALLBACK (toggle2_cb), lv);
 
   sw = gtk_scrolled_window_new ();
   gtk_stack_add_titled (GTK_STACK (stack), sw, "grid", "Grid");
