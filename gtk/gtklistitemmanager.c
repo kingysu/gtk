@@ -1566,6 +1566,18 @@ gtk_list_item_manager_model_items_changed_cb (GListModel         *model,
 }
 
 static void
+gtk_list_item_manager_model_sections_changed_cb (GListModel         *model,
+                                                 guint               position,
+                                                 guint               n_items,
+                                                 GtkListItemManager *self)
+{
+  if (!self->has_sections)
+    return;
+
+  gtk_list_item_manager_model_items_changed_cb (model, position, n_items, n_items, self);
+}
+
+static void
 gtk_list_item_manager_model_selection_changed_cb (GListModel         *model,
                                                   guint               position,
                                                   guint               n_items,
@@ -1623,6 +1635,9 @@ gtk_list_item_manager_clear_model (GtkListItemManager *self)
                                         self);
   g_signal_handlers_disconnect_by_func (self->model,
                                         gtk_list_item_manager_model_items_changed_cb,
+                                        self);
+  g_signal_handlers_disconnect_by_func (self->model,
+                                        gtk_list_item_manager_model_sections_changed_cb,
                                         self);
   g_clear_object (&self->model);
 
@@ -1682,6 +1697,11 @@ gtk_list_item_manager_set_model (GtkListItemManager *self,
                         "selection-changed",
                         G_CALLBACK (gtk_list_item_manager_model_selection_changed_cb),
                         self);
+      if (GTK_IS_SECTION_MODEL (model))
+        g_signal_connect (model,
+                          "sections-changed",
+                          G_CALLBACK (gtk_list_item_manager_model_sections_changed_cb),
+                          self);
 
       gtk_list_item_change_init (&change);
       gtk_list_item_manager_add_items (self, &change, 0, g_list_model_get_n_items (G_LIST_MODEL (model)));
