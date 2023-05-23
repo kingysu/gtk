@@ -742,6 +742,56 @@ test_empty_filter (void)
   g_object_unref (selection);
 }
 
+static void
+sections_changed (GtkSectionModel *model,
+                  unsigned int     start,
+                  unsigned int     end,
+                  gpointer         user_data)
+{
+  gboolean *got_it = user_data;
+
+  *got_it = TRUE;
+}
+
+static void
+test_sections (void)
+{
+  GtkFlattenListModel *model;
+  GListStore *models;
+  GListStore *store;
+  GtkSelectionModel *selection;
+  unsigned int start, end;
+  gboolean got_it;
+
+  models = g_list_store_new (G_TYPE_LIST_MODEL);
+
+  store = new_store (1, 5, 1);
+  g_list_store_append (G_LIST_STORE (models), store);
+  g_object_unref (store);
+
+  store = new_store (11, 15, 1);
+  g_list_store_append (G_LIST_STORE (models), store);
+  g_object_unref (store);
+
+  model = gtk_flatten_list_model_new (G_LIST_MODEL (models));
+  selection = GTK_SELECTION_MODEL (gtk_multi_selection_new (G_LIST_MODEL (model)));
+
+  gtk_section_model_get_section (GTK_SECTION_MODEL (selection), 0, &start, &end);
+  g_assert_cmpint (start, ==, 0);
+  g_assert_cmpint (end, ==, 5);
+
+  gtk_section_model_get_section (GTK_SECTION_MODEL (selection), 5, &start, &end);
+  g_assert_cmpint (start, ==, 5);
+  g_assert_cmpint (end, ==, 10);
+
+  got_it = FALSE;
+  g_signal_connect (selection, "sections-changed", G_CALLBACK (sections_changed), &got_it);
+  gtk_section_model_sections_changed (GTK_SECTION_MODEL (model), 0, 10);
+  g_assert_true (got_it);
+
+  g_object_unref (selection);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -764,6 +814,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/multiselection/set-model", test_set_model);
   g_test_add_func ("/multiselection/empty", test_empty);
   g_test_add_func ("/multiselection/selection-filter/empty", test_empty_filter);
+  g_test_add_func ("/multiselection/sections", test_sections);
 
   return g_test_run ();
 }
