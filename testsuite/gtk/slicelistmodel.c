@@ -423,7 +423,7 @@ test_sections (void)
   GtkSorter *section_sorter;
   guint s, e;
   GtkSliceListModel *slice;
-  gboolean got_it;
+  gboolean got_it = FALSE;
 
   list = gtk_string_list_new (strings);
   sorter = GTK_SORTER (gtk_string_sorter_new (gtk_property_expression_new (GTK_TYPE_STRING_OBJECT, NULL, "string")));
@@ -471,7 +471,9 @@ test_sections (void)
   g_assert_cmpint (e, ==, G_MAXUINT);
 
   g_signal_connect (slice, "sections-changed", G_CALLBACK (sections_changed), &got_it);
+
   gtk_sort_list_model_set_section_sorter (GTK_SORT_LIST_MODEL (sorted), NULL);
+
   g_assert_true (got_it);
 
   g_object_unref (slice);
