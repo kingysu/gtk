@@ -582,6 +582,25 @@ sort_func (gconstpointer p1,
   return (int)(s1[0]) - (int)(s2[0]);
 }
 
+typedef struct {
+  unsigned int count;
+  unsigned int start;
+  unsigned int end;
+} SectionChangedData;
+
+static void
+capture_section_changed (GtkSectionModel *model,
+                         unsigned int     start,
+                         unsigned int     end,
+                         gpointer         user_data)
+{
+  SectionChangedData *data = user_data;
+
+  data->count++;
+  data->start = start;
+  data->end = end;
+}
+
 static void
 test_sections (void)
 {
@@ -601,13 +620,22 @@ test_sections (void)
   GtkSortListModel *sorted;
   GtkSorter *section_sorter;
   guint s, e;
+  SectionChangedData section_data = { 0, };
 
   list = gtk_string_list_new (strings);
   sorter = GTK_SORTER (gtk_string_sorter_new (gtk_property_expression_new (GTK_TYPE_STRING_OBJECT, NULL, "string")));
   sorted = gtk_sort_list_model_new (G_LIST_MODEL (list), sorter);
+
+  g_signal_connect (sorted, "sections-changed", G_CALLBACK (capture_section_changed), &section_data);
+
   section_sorter = GTK_SORTER (gtk_custom_sorter_new (sort_func, NULL, NULL));
+
   gtk_sort_list_model_set_section_sorter (GTK_SORT_LIST_MODEL (sorted), section_sorter);
   g_object_unref (section_sorter);
+
+  g_assert_cmpint (section_data.count, ==, 1);
+  g_assert_cmpint (section_data.start, ==, 0);
+  g_assert_cmpint (section_data.end, ==, g_list_model_get_n_items (G_LIST_MODEL (sorted)));
 
   gtk_section_model_get_section (GTK_SECTION_MODEL (sorted), 0, &s, &e);
   g_assert_cmpint (s, ==, 0);
@@ -618,6 +646,11 @@ test_sections (void)
   gtk_section_model_get_section (GTK_SECTION_MODEL (sorted), 6, &s, &e);
   g_assert_cmpint (s, ==, 6);
   g_assert_cmpint (e, ==, 8);
+
+  gtk_sort_list_model_set_section_sorter (GTK_SORT_LIST_MODEL (sorted), NULL);
+  g_assert_cmpint (section_data.count, ==, 2);
+  g_assert_cmpint (section_data.start, ==, 0);
+  g_assert_cmpint (section_data.end, ==, g_list_model_get_n_items (G_LIST_MODEL (sorted)));
 
   g_object_unref (sorted);
 }
