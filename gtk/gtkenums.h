@@ -291,19 +291,26 @@ typedef enum
 
 /**
  * GtkListScrollFlags:
+ * @GTK_LIST_SCROLL_NONE: Default scroll behavior
  * @GTK_LIST_SCROLL_FOCUS: Focus the target item
  * @GTK_LIST_SCROLL_SELECT: Select the target item and
  *   unselect all other items.
  * @GTK_LIST_SCROLL_NO_SCROLL: Do not actually scroll,
  *   just perform actions from other flags.
+ * @GTK_LIST_SCROLL_NO_SECTION: Ignore section headers
+ *   when scrolling. The default behavior is to to
+ *   scroll section headers into view when scrolling
+ *   to the first item of a section
  *
  * List of actions to perform when scrolling to items in
  * a list widget.
  */
 typedef enum {
-  GTK_LIST_SCROLL_FOCUS     = 1 << 0,
-  GTK_LIST_SCROLL_SELECT    = 1 << 1,
-  GTK_LIST_SCROLL_NO_SCROLL = 1 << 2,
+  GTK_LIST_SCROLL_NONE       = 0,
+  GTK_LIST_SCROLL_FOCUS      = 1 << 0,
+  GTK_LIST_SCROLL_SELECT     = 1 << 1,
+  GTK_LIST_SCROLL_NO_SCROLL  = 1 << 2,
+  GTK_LIST_SCROLL_NO_SECTION = 1 << 3,
 } GtkListScrollFlags;
 
 /**
