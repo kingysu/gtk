@@ -36,6 +36,7 @@
 #include "gtkscrollable.h"
 #include "gtkscrollinfo.h"
 #include "gtksingleselection.h"
+#include "gtksectionmodelprivate.h"
 #include "gtksnapshot.h"
 #include "gtktypebuiltins.h"
 #include "gtkwidgetprivate.h"
@@ -872,10 +873,34 @@ gtk_list_base_compute_scroll_align (GtkListBase   *self,
     }
 }
 
+static gboolean
+gtk_list_base_get_header_allocation (GtkListBase  *self,
+                                     unsigned int  pos,
+                                     GdkRectangle *area)
+{
+  /* We assume that pos is at the start of a section,
+   * and simply go up a row to find the header.
+   *
+   * FIXME: This perhaps deserves its own vfunc
+   */
+  if (gtk_list_base_get_allocation (self, pos, area))
+    {
+      int xspacing, yspacing;
+
+      gtk_list_base_get_border_spacing (self, &xspacing, &yspacing);
+      area->y -= area->height + yspacing;
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
 static void
-gtk_list_base_scroll_to_item (GtkListBase   *self,
-                              guint          pos,
-                              GtkScrollInfo *scroll)
+gtk_list_base_scroll_to_item (GtkListBase        *self,
+                              guint               pos,
+                              GtkListScrollFlags  flags,
+                              GtkScrollInfo      *scroll)
 {
   GtkListBasePrivate *priv = gtk_list_base_get_instance_private (self);
   double align_along, align_across;
@@ -889,10 +914,23 @@ gtk_list_base_scroll_to_item (GtkListBase   *self,
       return;
     }
 
-  gtk_list_base_get_adjustment_values (GTK_LIST_BASE (self),
+  if (!(flags & GTK_LIST_SCROLL_NO_SECTION) &&
+      gtk_list_item_manager_get_has_sections (priv->item_manager))
+    {
+      GtkSelectionModel *model;
+      unsigned int start, end;
+
+      model = gtk_list_item_manager_get_model (priv->item_manager);
+      gtk_list_model_get_section (G_LIST_MODEL (model), pos, &start, &end);
+
+      if (pos == start)
+        gtk_list_base_get_header_allocation (GTK_LIST_BASE (self), pos, &area);
+    }
+
+  gtk_list_base_get_adjustment_values (self,
                                        gtk_list_base_get_orientation (GTK_LIST_BASE (self)),
                                        &viewport.y, NULL, &viewport.height);
-  gtk_list_base_get_adjustment_values (GTK_LIST_BASE (self),
+  gtk_list_base_get_adjustment_values (self,
                                        gtk_list_base_get_opposite_orientation (GTK_LIST_BASE (self)),
                                        &viewport.x, NULL, &viewport.width);
 
@@ -931,7 +969,7 @@ gtk_list_base_scroll_to_item_action (GtkWidget  *widget,
 
   g_variant_get (parameter, "u", &pos);
 
-  gtk_list_base_scroll_to_item (self, pos, NULL);
+  gtk_list_base_scroll_to_item (self, pos, 0, NULL);
 }
 
 static void
@@ -951,7 +989,7 @@ gtk_list_base_set_focus_child (GtkWidget *widget,
 
   if (pos != gtk_list_item_tracker_get_position (priv->item_manager, priv->focus))
     {
-      gtk_list_base_scroll_to_item (self, pos, NULL);
+      gtk_list_base_scroll_to_item (self, pos, 0, NULL);
       gtk_list_item_tracker_set_position (priv->item_manager,
                                           priv->focus,
                                           pos,
@@ -2484,6 +2522,6 @@ gtk_list_base_scroll_to (GtkListBase        *self,
     gtk_list_base_select_item (self, pos, FALSE, FALSE);
 
   if (!(flags & GTK_LIST_SCROLL_NO_SCROLL))
-    gtk_list_base_scroll_to_item (self, pos, scroll);
+    gtk_list_base_scroll_to_item (self, pos, flags, scroll);
 }
 
